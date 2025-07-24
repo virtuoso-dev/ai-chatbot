@@ -9,7 +9,6 @@ import type { Vote } from '@/lib/db/schema';
 import { fetcher, fetchWithErrorHandlers, generateUUID } from '@/lib/utils';
 import { Artifact } from './artifact';
 import { MultimodalInput } from './multimodal-input';
-import { Messages } from './messages';
 import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import { unstable_serialize } from 'swr/infinite';
@@ -22,7 +21,24 @@ import { useAutoResume } from '@/hooks/use-auto-resume';
 import { ChatSDKError } from '@/lib/errors';
 import type { Attachment, ChatMessage } from '@/lib/types';
 import { useDataStream } from './data-stream-provider';
+import {
+  VirtuosoMessageListLicense,
+  VirtuosoMessageList,
+  type VirtuosoMessageListProps,
+} from '@virtuoso.dev/message-list';
 
+const Message: VirtuosoMessageListProps<ChatMessage, null>['ItemContent'] = ({
+  data,
+}) => {
+  return (
+    <div style={{ border: '1px solid black', padding: '1rem' }}>
+      {data.parts
+        .filter((part) => part.type === 'text')
+        .map((part) => part.text)
+        .join(' ')}
+    </div>
+  );
+};
 export function Chat({
   id,
   initialMessages,
@@ -136,18 +152,32 @@ export function Chat({
           isReadonly={isReadonly}
           session={session}
         />
-
-        <Messages
-          chatId={id}
-          status={status}
-          votes={votes}
-          messages={messages}
-          setMessages={setMessages}
-          regenerate={regenerate}
-          isReadonly={isReadonly}
-          isArtifactVisible={isArtifactVisible}
-        />
-
+        <VirtuosoMessageListLicense licenseKey="">
+          <VirtuosoMessageList<ChatMessage, null>
+            style={{ height: 500 }}
+            // Avoids DOM remounts
+            computeItemKey={({ data }) => data.id}
+            // Necessary if loading messages from history happens
+            itemIdentity={(item) => item.id}
+            ItemContent={Message}
+            data={{
+              data: messages,
+              scrollModifier:
+                messages === initialMessages
+                  ? {
+                      type: 'item-location',
+                      location: {
+                        index: 'LAST',
+                        align: 'end',
+                      },
+                    }
+                  : {
+                      type: 'auto-scroll-to-bottom',
+                      autoScroll: 'smooth',
+                    },
+            }}
+          />
+        </VirtuosoMessageListLicense>
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
           {!isReadonly && (
             <MultimodalInput
